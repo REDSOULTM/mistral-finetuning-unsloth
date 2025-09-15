@@ -232,7 +232,7 @@ def create_combined_dataset():
 def run_training(model, tokenizer, dataset, formatting_func):
     """Ejecutar el proceso de fine-tuning"""
     print("🏋️ Iniciando fine-tuning...")
-    
+    print("DEBUG: tokenizer =", tokenizer)
     # Formatear dataset
     dataset = dataset.map(formatting_func, batched=True)
     
@@ -264,6 +264,7 @@ def run_training(model, tokenizer, dataset, formatting_func):
         train_dataset=dataset,
         args=training_args,
         formatting_func=formatting_func,
+        tokenizer=tokenizer,  # <-- Solución al error
     )
     
     print("✓ Trainer configurado")
