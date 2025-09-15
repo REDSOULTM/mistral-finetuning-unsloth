@@ -1,0 +1,358 @@
+# 🚀 Guía de instalac## 1) 🔧 Instalar WSL2 + Ubuntu 22.04
+
+### Paso 1.1: Verificar requisitos de Windows
+- **Windows 10** versión 2004+ o **Windows 11**
+- **GPU NVIDIA** con al menos 8GB VRAM (RTX 3070, 4060 Ti, 4070, etc.)
+
+### Paso 1.2: Activar WSL2
+1. Abrir **PowerShell como Administrador**:
+   - Buscar "PowerShell" en el menú Inicio
+   - Clic derecho → **"Ejecutar como administrador"**
+   - Si aparece UAC, hacer clic en **"Sí"**
+
+2. Copiar y pegar este comando:
+   ```powershell
+   wsl --install -d Ubuntu-22.04
+   ```
+
+3. **Esperar a que termine** (puede tardar 10-15 minutos).
+
+4. **Reiniciar la computadora** cuando lo pida.
+
+### Paso 1.3: Configurar Ubuntu
+1. Después del reinicio, buscar **"Ubuntu 22.04"** en el menú Inicio y abrirla.
+2. **Primera vez**: Te pedirá crear un usuario y contraseña de Linux:
+   - Usuario: Tu nombre (sin espacios, ej: `juan`, `maria`)
+   - Contraseña: La que quieras (no se ve al escribir, es normal)
+   - **¡IMPORTANTE!** Anota el usuario y contraseña, los vas a necesitar.
+
+### Paso 1.4: Verificar instalación
+En PowerShell (como admin), verificar:
+```powershell
+wsl --version
+wsl --list --verbose
+```
+
+Deberías ver Ubuntu-22.04 con estado "Running". + Ubuntu (WSL2) para usar el proyecto
+
+Este documento explica **paso a paso** cómo un usuario de **Windows** puede instalar **Ubuntu (WSL2)**,
+configurar GPU NVIDIA con **CUDA**, clonar este repositorio de **GitHub** y ejecutarlo en **VS Code**.
+
+**⏱️ Tiempo estimado:** 30-45 minutos  
+**💾 Espacio necesario:** 15-20GB  
+**🔧 Nivel:** Principiante (solo copiar y pegar comandos)
+
+---
+
+## 0) ✅ Qué vas a lograr
+- Instalar **Ubuntu 22.04 en WSL2** (Linux dentro de Windows, sin reemplazar Windows).
+- Configurar **drivers NVIDIA** y **PyTorch con CUDA 12.x** para usar tu GPU.
+- Descargar y ejecutar este proyecto de **fine-tuning de Mistral-7B**.
+- Abrir todo en **VS Code** con el entorno Python correcto.
+
+**🎯 Al final tendrás:** Tu propia versión de Mistral-7B entrenada con tus datos.
+
+---
+
+## 1) Instalar WSL2 + Ubuntu 22.04
+
+1. Abrir **PowerShell como Administrador** (clic derecho → “Ejecutar como admin”).
+2. Ejecutar:
+   ```powershell
+   wsl --install -d Ubuntu-22.04
+   ```
+3. Reiniciar si lo pide.
+4. Abrir la app **Ubuntu 22.04** (desde el menú Inicio), elegir usuario y contraseña de Linux.
+
+Comprobar versión de WSL:
+```powershell
+wsl --version
+```
+
+---
+
+## 2) 🎮 Instalar driver NVIDIA con soporte WSL
+
+### Paso 2.1: Descargar driver NVIDIA
+1. Ir a https://www.nvidia.com/drivers
+2. Seleccionar tu GPU (ej: GeForce RTX 4070)
+3. Descargar el **driver más reciente** (Game Ready o Studio)
+4. **Instalar normalmente** en Windows
+5. **Reiniciar** la computadora
+
+### Paso 2.2: Verificar que funciona
+1. Abrir **Ubuntu 22.04** desde el menú Inicio
+2. Escribir este comando y presionar Enter:
+   ```bash
+   nvidia-smi
+   ```
+
+**✅ Si funciona:** Verás información de tu GPU  
+**❌ Si no funciona:** Verás "command not found" → Reinstalar driver NVIDIA
+
+### 🚨 Problema común:
+Si `nvidia-smi` no funciona:
+- Asegúrate de tener el **driver NVIDIA más reciente**
+- **NO instales** CUDA manualmente en WSL2 (viene automático)
+
+---
+
+## 3) 🔄 Preparar Ubuntu (actualizar e instalar herramientas)
+
+### Paso 3.1: Actualizar Ubuntu
+En la ventana de **Ubuntu 22.04**, copiar y pegar estos comandos uno por uno:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+*Te pedirá la contraseña de Linux que creaste antes (no se ve al escribir)*
+
+```bash
+sudo apt install -y python3 python3-venv python3-pip git build-essential curl wget
+```
+
+### Paso 3.2: Verificar Python
+```bash
+python3 --version
+```
+Debería mostrar algo como "Python 3.10.x"
+
+**💡 Tip:** En Ubuntu, usa `python3` (no `python`)
+
+---
+
+## 4) 💻 Instalar VS Code + extensiones
+
+### Paso 4.1: Instalar VS Code en Windows
+1. Ir a https://code.visualstudio.com/
+2. Descargar e instalar **normalmente** en Windows
+
+### Paso 4.2: Instalar extensiones importantes
+Abrir **VS Code** y ir a la pestaña **Extensions** (ícono de cuadrados en la barra izquierda):
+
+**📦 Extensiones necesarias:**
+- **Remote - WSL** (de Microsoft)
+- **Python** (de Microsoft)  
+- **Jupyter** (de Microsoft)
+
+### Paso 4.3: Conectar VS Code con Ubuntu
+1. En VS Code, presionar `Ctrl + Shift + P`
+2. Escribir: **Remote-WSL: New Window**
+3. Presionar Enter
+4. Se abrirá una **nueva ventana** conectada a Ubuntu
+
+**💡 Importante:** Usar siempre la ventana "Remote-WSL" para trabajar con el proyecto.
+
+---
+
+## 5) 📥 Descargar el proyecto de GitHub
+
+### Opción A: Clonar directamente en Ubuntu (RECOMENDADO)
+En la ventana de **Ubuntu 22.04**:
+
+```bash
+# Crear carpeta para proyectos
+mkdir -p ~/projects
+cd ~/projects
+
+# Clonar el repositorio
+git clone https://github.com/REDSOULTM/mistral-finetuning-unsloth.git
+
+# Entrar a la carpeta del proyecto
+cd mistral-finetuning-unsloth
+
+# Ver que está todo
+ls -la
+```
+
+### Opción B: Si ya lo descargaste en Windows
+Si ya tienes el proyecto en una carpeta de Windows como:
+`C:\Users\TuUsuario\Downloads\mistral-finetuning-unsloth`
+
+Copiarlo a Ubuntu:
+```bash
+mkdir -p ~/projects
+cp -r "/mnt/c/Users/TuUsuario/Downloads/mistral-finetuning-unsloth" ~/projects/
+cd ~/projects/mistral-finetuning-unsloth
+```
+
+**🔍 Verificar:** Deberías ver carpetas como `RealizarFineTuning/`, `Instalar Requesitos/`, etc.
+
+---
+
+## 6) 🐍 Crear entorno de Python
+
+En Ubuntu, dentro de la carpeta del proyecto:
+
+```bash
+# Asegúrate de estar en la carpeta correcta
+cd ~/projects/mistral-finetuning-unsloth
+
+# Crear entorno virtual
+python3 -m venv .venv
+
+# Activar entorno virtual
+source .venv/bin/activate
+
+# Verificar Python
+python --version
+pip --version
+
+# Actualizar pip
+pip install --upgrade pip
+```
+
+**✅ Éxito:** El prompt debería cambiar y mostrar `(.venv)` al inicio.
+
+**💡 Importante:** Cada vez que abras Ubuntu, tendrás que activar el entorno:
+```bash
+cd ~/projects/mistral-finetuning-unsloth
+source .venv/bin/activate
+```
+
+---
+
+## 7) 🚀 Instalar el proyecto automáticamente
+
+### ¡LA FORMA FÁCIL! Usar el instalador automático incluido:
+
+```bash
+# Asegúrate de tener el entorno activado
+cd ~/projects/mistral-finetuning-unsloth
+source .venv/bin/activate
+
+# Usar el instalador automático
+cd "Instalar Requesitos"
+python InstalarTodo.py
+```
+
+**⏱️ Tiempo:** 10-15 minutos (descarga ~5GB)
+
+### Si el instalador automático falla, instalación manual:
+
+```bash
+# PyTorch con CUDA 12.1
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# Dependencias del proyecto  
+pip install transformers accelerate datasets peft sentencepiece bitsandbytes
+pip install "trl<0.9.0" ipykernel jupyter
+
+# Unsloth (puede tardar un poco)
+pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+```
+
+### Verificar que todo funciona:
+```bash
+cd ..  # Volver a la carpeta principal
+cd "Instalar Requesitos"
+python VerificarTodo.py
+```
+
+**✅ Si todo está bien:** Verás mensajes de éxito  
+**❌ Si hay problemas:** El script te dirá qué falta
+
+---
+
+## 8) 🎯 Ejecutar el proyecto
+
+### Paso 8.1: Abrir VS Code desde Ubuntu
+En la terminal de Ubuntu:
+```bash
+cd ~/projects/mistral-finetuning-unsloth
+code .
+```
+
+Esto abrirá VS Code conectado a Ubuntu con tu proyecto.
+
+### Paso 8.2: Seleccionar el intérprete de Python
+1. En VS Code, presionar `Ctrl + Shift + P`
+2. Escribir: **Python: Select Interpreter**
+3. Elegir: `./.venv/bin/python` (el de tu entorno virtual)
+
+### Paso 8.3: Ejecutar el fine-tuning
+En la terminal de VS Code (o Ubuntu):
+```bash
+# Activar entorno si no está activado
+source .venv/bin/activate
+
+# Ir a la carpeta de entrenamiento
+cd "RealizarFineTuning"
+
+# Ejecutar el script principal
+python mistral_finetuning_final.py
+```
+
+**🎮 El script te preguntará qué configuración quieres:**
+1. Solo tu dataset (máxima especialización)
+2. **Tu dataset + dataset general (RECOMENDADO)**
+3. Solo dataset general
+
+### Paso 8.4: ¡Esperar y disfrutar! ⏱️
+- **RTX 4090:** 3-5 minutos
+- **RTX 4070 Ti:** 8-12 minutos  
+- **RTX 3070:** 15-20 minutos
+
+**💾 Tu modelo entrenado se guardará en:** `outputs/mistral_finetuned_[config]/`
+
+---
+
+## 9) 💡 Tips y solución de problemas
+
+### 🔧 Comandos útiles
+```bash
+# Activar entorno virtual (hacer cada vez que abras Ubuntu)
+cd ~/projects/mistral-finetuning-unsloth
+source .venv/bin/activate
+
+# Ver uso de GPU durante entrenamiento
+nvidia-smi
+
+# Ver archivos en Ubuntu desde Windows
+# Los archivos en ~/projects/ aparecen en:
+# \\wsl$\Ubuntu-22.04\home\TuUsuario\projects\
+```
+
+### 🚨 Problemas comunes
+
+**"CUDA out of memory":**
+```bash
+# Editar el archivo de configuración
+cd "RealizarFineTuning"
+nano mistral_finetuning_final.py
+# Cambiar línea ~275: per_device_train_batch_size = 1
+```
+
+**"VS Code no encuentra Python":**
+- `Ctrl + Shift + P` → **Python: Select Interpreter** → `./.venv/bin/python`
+
+**"No puedo encontrar mis archivos":**
+- Ubuntu: `~/projects/mistral-finetuning-unsloth/`
+- Windows: `\\wsl$\Ubuntu-22.04\home\TuUsuario\projects\mistral-finetuning-unsloth\`
+
+**"El entrenamiento va muy lento":**
+- Verificar: `nvidia-smi` (debe mostrar tu GPU)
+- Si no: Reinstalar driver NVIDIA más reciente
+
+### � Performance esperado
+| GPU | Tiempo | VRAM usada | Batch size recomendado |
+|-----|--------|------------|------------------------|
+| RTX 3070 (8GB) | 15-20 min | 7.5GB | 1-2 |
+| RTX 4060 Ti (16GB) | 12-15 min | 8GB | 2-4 |
+| RTX 4070 Ti (12GB) | 8-12 min | 8GB | 2-4 |
+| RTX 4080 (16GB) | 5-8 min | 8GB | 4-8 |
+| RTX 4090 (24GB) | 3-5 min | 8GB | 8-16 |
+
+---
+
+## 🎉 ¡Felicitaciones!
+
+Si llegaste hasta acá, ya tienes:
+- ✅ Ubuntu (WSL2) funcionando en Windows
+- ✅ GPU NVIDIA configurada con CUDA
+- ✅ El proyecto de fine-tuning instalado y funcionando
+- ✅ VS Code configurado para desarrollo en Linux
+
+**🚀 Ahora puedes entrenar tu propia versión de Mistral-7B con tus datos!**
+
+**📧 ¿Problemas?** Abre un issue en: https://github.com/REDSOULTM/mistral-finetuning-unsloth/issues
