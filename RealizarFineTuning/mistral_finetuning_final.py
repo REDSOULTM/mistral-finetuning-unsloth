@@ -264,7 +264,7 @@ def run_training(model, tokenizer, dataset, formatting_func):
         train_dataset=dataset,
         args=training_args,
         formatting_func=formatting_func,
-        tokenizer=tokenizer,  # <-- Solución al error
+        # tokenizer=tokenizer,  # <-- Removido, no es parámetro válido
     )
     
     print("✓ Trainer configurado")
