@@ -8,7 +8,7 @@ Un sistema para que puedas entrenar tu propio modelo Mistral-7B, usando Unsloth,
 
 ---
 
-## ¿Qué podés hacer acá?
+## ¿Qué puedes hacer acá?
 - Entrenar Mistral-7B con tu propio dataset (ej: Transportes Miramar)
 - Elegir si querés que el modelo sea experto en tu tema, equilibrado, o genérico
 - Instalar todo con un solo comando
