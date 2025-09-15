@@ -155,7 +155,7 @@ class UnslothDDPOConfig(DDPOConfig):
     
     def __init__(
         self,
-        exp_name = 'VerificarTodo',
+        exp_name = 'mistral_finetuning_final',
         run_name = '',
         seed = 3407,
         log_with = None,
