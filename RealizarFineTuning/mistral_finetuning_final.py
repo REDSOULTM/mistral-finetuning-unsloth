@@ -241,7 +241,7 @@ def run_training(model, tokenizer, dataset, formatting_func):
         per_device_train_batch_size=2,
         gradient_accumulation_steps=4,
         warmup_steps=5,
-        max_steps=60,
+        max_steps=60,  # Cambiá este valor según tu entrenamiento
         learning_rate=2e-4,
         fp16=not torch.cuda.is_bf16_supported(),
         bf16=torch.cuda.is_bf16_supported(),
@@ -259,38 +259,42 @@ def run_training(model, tokenizer, dataset, formatting_func):
     print("✓ Argumentos de entrenamiento configurados")
     
     # Crear trainer
+    # Workaround para Unsloth: adjuntar tokenizer al modelo (ambos atributos)
+    model.tokenizer = tokenizer
+    model._tokenizer = tokenizer
     trainer = SFTTrainer(
         model=model,
         train_dataset=dataset,
         args=training_args,
         formatting_func=formatting_func,
-        # tokenizer=tokenizer,  # <-- Removido, no es parámetro válido
+        tokenizer=tokenizer,  # <-- No permitido por tu versión
     )
-    
     print("✓ Trainer configurado")
-    
+
     # Mostrar estadísticas antes del entrenamiento
     gpu_stats = torch.cuda.get_device_properties(0)
     start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
     max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
     print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
     print(f"Memoria GPU inicial: {start_gpu_memory} GB.")
-    
+
     # Entrenar
     print("\n🚀 Iniciando entrenamiento...")
-    trainer_stats = trainer.train()
+    if trainer is not None:
+        trainer_stats = trainer.train()
+        
+        # Estadísticas finales
+        used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+        used_memory_training = round(used_memory - start_gpu_memory, 3)
+        used_percentage = round(used_memory / max_memory * 100, 3)
+        print(f"\n✅ Entrenamiento completado!")
+        print(f"Memoria GPU usada: {used_memory} GB ({used_percentage}%)")
+        print(f"Memoria adicional para entrenamiento: {used_memory_training} GB")
+        print(f"Tiempo de entrenamiento: {trainer_stats.metrics['train_runtime']:.2f} segundos")
+    else:
+        print("⚠️  El entrenamiento fue omitido porque no se pudo crear el trainer.")
     
-    # Estadísticas finales
-    used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
-    used_memory_training = round(used_memory - start_gpu_memory, 3)
-    used_percentage = round(used_memory / max_memory * 100, 3)
-    
-    print(f"\n✅ Entrenamiento completado!")
-    print(f"Memoria GPU usada: {used_memory} GB ({used_percentage}%)")
-    print(f"Memoria adicional para entrenamiento: {used_memory_training} GB")
-    print(f"Tiempo de entrenamiento: {trainer_stats.metrics['train_runtime']:.2f} segundos")
-    
-    return model, tokenizer
+    return model, tokenizer, training_args.max_steps  # <-- devolvé los steps
 
 def save_model(model, tokenizer, save_directory="./mistral_finetuned", suffix=""):
     """Guardar el modelo fine-tuneado"""
@@ -469,9 +473,10 @@ def main():
         print(f"\n📊 Dataset final: {len(dataset)} ejemplos para entrenamiento\n")
         
         # 4. Ejecutar fine-tuning
-        model, tokenizer = run_training(model, tokenizer, dataset, formatting_func)
+        model, tokenizer, steps = run_training(model, tokenizer, dataset, formatting_func)
         
         # 5. Guardar modelo con sufijo descriptivo
+        save_suffix = f"{save_suffix}_steps{steps}"  # <-- agregá los steps al sufijo
         save_directory = save_model(model, tokenizer, suffix=save_suffix)
         
         # 6. Probar inferencia

@@ -1,7 +1,8 @@
 # 🚀 Mistral Fine-tuning con Unsloth - Proyecto hecho fácil
 
 ---
-
+NOTA IMPORTANTE : max_steps=60 es solo para pruebas rápidas. Para un entrenamiento serio, usá 5000 o más (ver tabla abajo).
+Osea que si no se cambia esto al ejecutar el Fine Tuning solo sera para probar el codigo, esto debe ser cambiado si de verdad quieres entrenar el modelo.
 ## ¿Qué es esto?
 
 Un sistema para que puedas entrenar tu propio modelo Mistral-7B, usando Unsloth, con tus datos y en tu compu. Todo pensado para que no te vuelvas loco con dependencias, carpetas raras o comandos que no sabés para qué sirven.
