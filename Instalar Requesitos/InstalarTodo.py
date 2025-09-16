@@ -36,7 +36,7 @@ def print_banner():
     print("   ├── Dataset de Miramar/ (datos)")
     print("   └── outputs/ (resultados)")
     print("=" * 70)
-    print()
+    print("")
 
 def print_section(title):
     """Imprime una sección con formato"""
@@ -159,14 +159,16 @@ def run_command(command, description, critical=True):
             print("⚠️  Error no crítico, continuando...")
             return True
 
+# Usar el pip del intérprete actual
+PIP_CMD = f'"{sys.executable}" -m pip install'
+
 def install_pytorch():
     """Instala PyTorch con soporte CUDA"""
     print_section("INSTALANDO PYTORCH CON CUDA")
     
     # Comando optimizado para CUDA 12.1
     pytorch_cmd = (
-        "pip install torch torchvision torchaudio "
-        "--index-url https://download.pytorch.org/whl/cu121"
+        f'{PIP_CMD} torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121'
     )
     
     return run_command(pytorch_cmd, "Instalando PyTorch con CUDA 12.1")
@@ -176,13 +178,17 @@ def install_unsloth():
     print_section("INSTALANDO UNSLOTH")
     
     # Instalar desde git (versión más actualizada)
-    unsloth_cmd = 'pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"'
-    
-    if not run_command(unsloth_cmd, "Instalando Unsloth desde GitHub", critical=False):
+    unsloth_cmd = f'{PIP_CMD} "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"'
+    zoo_cmd = f'{PIP_CMD} --upgrade --force-reinstall unsloth_zoo'
+    ok1 = run_command(unsloth_cmd, "Instalando Unsloth desde GitHub", critical=False)
+    ok2 = run_command(zoo_cmd, "Instalando unsloth_zoo", critical=False)
+    if not (ok1 and ok2):
         print("💡 Intentando instalación desde PyPI...")
-        fallback_cmd = "pip install unsloth"
-        return run_command(fallback_cmd, "Instalando Unsloth desde PyPI")
-    
+        fallback_cmd = f'{PIP_CMD} unsloth'
+        fallback_zoo = f'{PIP_CMD} --upgrade --force-reinstall unsloth_zoo'
+        ok3 = run_command(fallback_cmd, "Instalando Unsloth desde PyPI")
+        ok4 = run_command(fallback_zoo, "Instalando unsloth_zoo desde PyPI")
+        return ok3 and ok4
     return True
 
 def install_transformers_ecosystem():
@@ -193,17 +199,20 @@ def install_transformers_ecosystem():
         "transformers>=4.40.0",
         "datasets",
         "accelerate",
-        "peft",
+        "peft>=0.7.0",
         "trl",
         "bitsandbytes",
         "scipy",
         "scikit-learn"
     ]
-    
     for package in packages:
-        if not run_command(f"pip install {package}", f"Instalando {package}"):
+        # Forzar actualización y reinstalación para evitar conflictos
+        if package.startswith("peft") or package.startswith("transformers"):
+            cmd = f'{PIP_CMD} --upgrade --force-reinstall {package}'
+        else:
+            cmd = f'{PIP_CMD} {package}'
+        if not run_command(cmd, f"Instalando {package}"):
             return False
-    
     return True
 
 def install_compatibility_fixes():
@@ -220,7 +229,12 @@ def install_compatibility_fixes():
     ]
     
     for fix in fixes:
-        if not run_command(f"pip install {fix}", f"Instalando {fix}"):
+        # Quote numpy version specifier to avoid shell redirection error
+        if fix.startswith("numpy<"):
+            fix_cmd = f'{PIP_CMD} "{fix}"'
+        else:
+            fix_cmd = f'{PIP_CMD} {fix}'
+        if not run_command(fix_cmd, f"Instalando {fix}"):
             return False
     
     return True
@@ -369,6 +383,12 @@ def show_final_instructions():
     print()
     print("🚀 ¡LISTO PARA ENTRENAR MODELOS!")
 
+def force_reinstall_critical():
+    """Fuerza la reinstalación de peft, unsloth y unsloth_zoo"""
+    print_section("REINSTALANDO PEFT, UNSLOTH Y UNSLOTH_ZOO (FORZADO)")
+    cmd = f'"{sys.executable}" -m pip install --upgrade --force-reinstall peft unsloth unsloth_zoo'
+    return run_command(cmd, "Reinstalando peft, unsloth y unsloth_zoo")
+
 def main():
     """Función principal del instalador"""
     print_banner()
@@ -415,7 +435,10 @@ def main():
             print(f"\n💥 FALLO EN: {step_name}")
             print("🛑 Instalación detenida")
             sys.exit(1)
-    
+
+    # Fuerza reinstalación de los paquetes críticos
+    force_reinstall_critical()
+
     # 3. Verificar instalación
     print(f"\n🔍 Verificando instalación completa...")
     if not verify_installation():
