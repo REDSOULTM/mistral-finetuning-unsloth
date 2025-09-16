@@ -106,7 +106,7 @@ def main():
     
     folders_to_check = [
         ("RealizarFineTuning", "Scripts de entrenamiento"),
-        ("Dataset de Miramar", "Datasets personalizados"),
+        ("Dataset_de_Miramar", "Datasets personalizados"),  # Updated folder name
         ("Instalar Requesitos", "Scripts de instalación")
     ]
     
