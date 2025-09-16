@@ -129,7 +129,7 @@ def load_miramar_dataset():
     print("🚛 Cargando dataset Transportes Miramar...")
     
     # Buscar el dataset en la carpeta correspondiente
-    dataset_file = "../Dataset de Miramar/transportes_miramar_dataset_20k_20250909_044327.jsonl"
+    dataset_file = "../Dataset_de_Miramar/transportes_miramar_dataset_20k_20250909_044327.jsonl"
     
     if not os.path.exists(dataset_file):
         print(f"❌ Archivo no encontrado: {dataset_file}")

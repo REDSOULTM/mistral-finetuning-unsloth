@@ -234,10 +234,10 @@ loss_logs/
 !tokenizer.json
 
 # Dataset directory content (preserve folder structure)
-Dataset\ de\ Miramar/*.jsonl
-Dataset\ de\ Miramar/*.json
-!Dataset\ de\ Miramar/README.md
-!Dataset\ de\ Miramar/.gitkeep
+Dataset_de_Miramar/*.jsonl
+Dataset_de_Miramar/*.json
+!Dataset_de_Miramar/README.md
+!Dataset_de_Miramar/.gitkeep
 
 # Training outputs in organized folders
 RealizarFineTuning/outputs/
