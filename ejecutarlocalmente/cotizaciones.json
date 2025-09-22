@@ -1,0 +1,98 @@
+[
+    {
+        "origen": "Valparaiso",
+        "destino": "Destino: Santiago",
+        "fecha": "2025-10-15",
+        "hora": "09:00",
+        "regreso": "regreso: Santiago",
+        "cantidad": 1
+    },
+    {
+        "origen": "Import Torch",
+        "destino": "From Unsloth Import Fastlanguagemodel",
+        "fecha": "client_response = {",
+        "hora": "client_response = {",
+        "regreso": "client_response = {",
+        "cantidad": 2
+    },
+    {
+        "origen": "User_input = \"santiago, Región Metropolitana",
+        "destino": "User_input = \"santiago, Región Metropolitana",
+        "fecha": "El valor limpio y breve para el campo 'fecha' sería: '2023-03-15'",
+        "hora": "fecha: '2023-03-15'",
+        "regreso": "Para el campo 'regreso': 'rf\"(?:de|en)\\s+({_LUGAR_WORD})$\"'.",
+        "cantidad": 1
+    },
+    {
+        "origen": "Santiago",
+        "destino": "de mi Viaje",
+        "fecha": "2025-08-15",
+        "hora": "09:00",
+        "regreso": "No",
+        "cantidad": 9
+    },
+    {
+        "origen": "Valparaiso",
+        "destino": "Santiago",
+        "fecha": "2025-10-25",
+        "hora": "21:00",
+        "regreso": "No",
+        "cantidad": 6
+    },
+    {
+        "origen": "Santiago",
+        "destino": "Viña Del Mar",
+        "fecha": "2025-11-15",
+        "hora": "12:00",
+        "regreso": "No",
+        "cantidad": 10
+    },
+    {
+        "ejemplo": "dato"
+    },
+    {
+        "origen": "Santiago",
+        "destino": "Valparaiso",
+        "fecha": "2025-10-10",
+        "hora": "22:00",
+        "regreso": "no",
+        "cantidad": 9,
+        "especial": "no"
+    },
+    {
+        "origen": "Santiago",
+        "destino": "Valparaiso",
+        "fecha": "2022-10-19",
+        "hora": "09:00",
+        "regreso": "no",
+        "cantidad": 3,
+        "especial": ""
+    },
+    {
+        "origen": "Valparaiso",
+        "destino": "Limache",
+        "fecha": "2025-10-25",
+        "hora": "15:00",
+        "regreso": "no",
+        "cantidad": 3,
+        "especial": ""
+    },
+    {
+        "origen": "Limache",
+        "destino": "Santiago",
+        "fecha": "2025-10-10",
+        "hora": "02:00",
+        "regreso": "no",
+        "cantidad": 3,
+        "especial": ""
+    },
+    {
+        "origen": "Valparaiso",
+        "destino": "Limache",
+        "fecha": "2025-10-25",
+        "hora": "02:00",
+        "regreso": "no",
+        "cantidad": 6,
+        "especial": ""
+    }
+]
