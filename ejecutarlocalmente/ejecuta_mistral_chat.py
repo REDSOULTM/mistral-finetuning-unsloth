@@ -11,6 +11,8 @@ import unicodedata
 # Configuración de rutas
 # -----------------------
 ROOT = os.path.abspath(os.path.dirname(__file__))
+# BASE_MODEL_DIR = os.path.join(ROOT, "mistral-7b-bnb-4bit") Si tienes el modelo en una carpeta
+#Si tienes el modelo en la raiz del proyecto
 BASE_MODEL_DIR = os.path.abspath(os.path.join(ROOT, "..", "mistral-7b-bnb-4bit"))
 LORA_ADAPTER_DIR = os.path.join(ROOT, "mistral_finetuned_miramar_combined_steps20000")
 COTIZACIONES_FILE = os.path.join(ROOT, "cotizaciones.json")
@@ -126,51 +128,71 @@ def _question_mentions_forbidden(question: str, missing: list[str]) -> bool:
     return False
 
 
+def _select_question_fields(missing: list[str]) -> list[str]:
+    ordered = ["origen", "destino", "fecha", "hora", "regreso", "cantidad"]
+    missing_set = set(missing)
+    if not missing_set:
+        return []
+    if {"origen", "destino"}.issubset(missing_set):
+        return ["origen", "destino"]
+    if {"fecha", "hora"}.issubset(missing_set):
+        return ["fecha", "hora"]
+    if {"regreso", "cantidad"}.issubset(missing_set):
+        return ["regreso", "cantidad"]
+    selected: list[str] = []
+    for field in ordered:
+        if field in missing_set:
+            selected.append(field)
+            if len(selected) == 2:
+                break
+    return selected
+
+
 def _build_fallback_question(missing: list[str]) -> str | None:
-    ms = set(missing)
-    # Caso clásico origen y destino juntos
-    if "origen" in ms and "destino" in ms:
-        return "¿Desde qué lugar inicia tu viaje y cuál es el destino?"
-
-    segments: list[str] = []
-
-    if "origen" in ms:
-        segments.append("desde qué lugar inicia tu viaje")
-        ms.discard("origen")
-    if "destino" in ms:
-        segments.append("hacia dónde necesitas viajar")
-        ms.discard("destino")
-
-    if "fecha" in ms and "hora" in ms:
-        segments.append("para qué fecha y a qué hora será el viaje")
-        ms.discard("fecha")
-        ms.discard("hora")
-    else:
-        if "fecha" in ms:
-            segments.append("en qué fecha necesitas el servicio")
-            ms.discard("fecha")
-        if "hora" in ms:
-            segments.append("a qué hora desean comenzar el viaje")
-            ms.discard("hora")
-
-    if "regreso" in ms and "cantidad" in ms:
-        segments.append("si es solo ida o incluye regreso y cuántas personas viajarán")
-        ms.discard("regreso")
-        ms.discard("cantidad")
-    else:
-        if "regreso" in ms:
-            segments.append("si el servicio es solo ida o incluye regreso")
-            ms.discard("regreso")
-        if "cantidad" in ms:
-            segments.append("cuántas personas viajarán")
-            ms.discard("cantidad")
-
-    if not segments:
+    ordered = ["origen", "destino", "fecha", "hora", "regreso", "cantidad"]
+    remaining = [item for item in ordered if item in missing]
+    if not remaining:
         return None
-    if len(segments) == 1:
-        body = segments[0]
-    else:
-        body = ", ".join(segments[:-1]) + " y " + segments[-1]
+
+    parts: list[str] = []
+
+    if "origen" in remaining and "destino" in remaining:
+        parts.append("desde qué lugar parte tu viaje y cuál es el destino")
+        remaining = [item for item in remaining if item not in {"origen", "destino"}]
+    elif "origen" in remaining:
+        parts.append("desde qué lugar parte tu viaje")
+        remaining.remove("origen")
+    elif "destino" in remaining:
+        parts.append("hacia dónde necesitas viajar")
+        remaining.remove("destino")
+
+    if len(parts) < 2 and "fecha" in remaining and "hora" in remaining:
+        parts.append("para qué fecha y a qué hora será el viaje")
+        remaining = [item for item in remaining if item not in {"fecha", "hora"}]
+
+    if len(parts) < 2 and "fecha" in remaining:
+        parts.append("en qué fecha tienen previsto el viaje")
+        remaining.remove("fecha")
+
+    if len(parts) < 2 and "hora" in remaining:
+        parts.append("a qué hora desean iniciar el viaje")
+        remaining.remove("hora")
+
+    if len(parts) < 2 and "regreso" in remaining and "cantidad" in remaining:
+        parts.append("si es solo ida o incluye regreso y cuántas personas viajarán")
+        remaining = [item for item in remaining if item not in {"regreso", "cantidad"}]
+
+    if len(parts) < 2 and "regreso" in remaining:
+        parts.append("si el servicio es solo ida o incluye regreso")
+        remaining.remove("regreso")
+
+    if len(parts) < 2 and "cantidad" in remaining:
+        parts.append("cuántas personas viajarán")
+        remaining.remove("cantidad")
+
+    if not parts:
+        return None
+    body = parts[0] if len(parts) == 1 else f"{parts[0]} y {parts[1]}"
     return f"¿{body}?"
 
 
@@ -192,6 +214,56 @@ WEEKDAYS = {
     # inglés por si aparece
     "monday":0,"tuesday":1,"wednesday":2,"thursday":3,"friday":4,"saturday":5,"sunday":6,
 }
+
+MONTH_PATTERN = "|".join(
+    sorted({re.escape(k) for k in MONTHS.keys()}, key=len, reverse=True)
+)
+
+DATE_PATTERNS = [
+    re.compile(r"\b\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b"),
+    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),
+    re.compile(rf"\b\d{{1,2}}\s+de\s+({MONTH_PATTERN})\b", re.IGNORECASE),
+    re.compile(rf"\b({MONTH_PATTERN})\s+\d{{1,2}}\b", re.IGNORECASE),
+]
+
+DATE_KEYWORDS = {
+    "hoy",
+    "mañana",
+    "pasado mañana",
+    "pasado-manana",
+    "proximo",
+    "próximo",
+    "este",
+}
+
+TIME_PATTERNS = [
+    re.compile(r"\b\d{1,2}:\d{2}\s*(?:am|pm|hrs|horas|h)?\b", re.IGNORECASE),
+    re.compile(r"\b\d{1,2}\s*(?:am|pm)\b", re.IGNORECASE),
+    re.compile(r"\b(?:medianoche|mediod[ií]a|mediodia)\b", re.IGNORECASE),
+]
+
+REGRESO_NO_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"\bsin\s+regreso\b",
+        r"\bsin\s+vuelta\b",
+        r"\bsin\s+retorno\b",
+        r"\bsolo\s+ida\b",
+        r"\bida\s+solamente\b",
+        r"\bno\s+regreso\b",
+    ]
+]
+
+REGRESO_YES_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"\bcon\s+regreso\b",
+        r"\bida\s+y\s+vuelta\b",
+        r"\bida\s+y\s+regreso\b",
+        r"\bcon\s+retorno\b",
+        r"\bcon\s+vuelta\b",
+    ]
+]
 
 def _titlecase_clean(s: str) -> str:
     s = s.strip().strip(".,;:!¿?'()[]{}")
@@ -330,6 +402,40 @@ def normalize_fecha(value: str, context: str) -> str:
         candidate = datetime.date(today.year + 1, date_only.month, date_only.day)
     return candidate.isoformat()
 
+
+def user_mentions_date(user_input: str) -> bool:
+    if not user_input:
+        return False
+    text = unicodedata.normalize("NFKC", user_input)
+    lowered = text.lower()
+    for pat in DATE_PATTERNS:
+        if pat.search(text):
+            return True
+    for word in DATE_KEYWORDS:
+        if word in lowered:
+            return True
+    return False
+
+
+def user_mentions_time(user_input: str) -> bool:
+    if not user_input:
+        return False
+    text = unicodedata.normalize("NFKC", user_input)
+    for pat in TIME_PATTERNS:
+        if pat.search(text):
+            return True
+    return False
+
+
+def user_mentions_regreso(user_input: str) -> bool:
+    if not user_input:
+        return False
+    text = unicodedata.normalize("NFKC", user_input)
+    for pat in REGRESO_NO_PATTERNS + REGRESO_YES_PATTERNS:
+        if pat.search(text):
+            return True
+    return False
+
 def _pick_last_capitalized_chunk(text: str) -> str | None:
     # Como último recurso: toma la última “palabra o 2-3 palabras” con pinta de nombre propio
     tokens = [t for t in re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\-']+", text)]
@@ -417,7 +523,7 @@ def guardar_cotizacion(state: dict):
     data.append(state)
     with open(COTIZACIONES_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
-    print(f"\n📁 Cotización guardada en {COTIZACIONES_FILE}")
+    print(f"\nTransportes Miramar: 📁 Cotización guardada en {COTIZACIONES_FILE}")
 
 # -----------------------
 # Carga de modelo
@@ -436,7 +542,7 @@ def load_model_and_tokenizer():
     FastLanguageModel.for_inference(model)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
-    print("✅ Modelo cargado y listo para inferencia.\n")
+    print("Modelo cargado.\n")
     return model, tokenizer, device
 
 BASE_STYLE = """
@@ -451,6 +557,7 @@ Varía levemente la redacción en cada turno para sonar natural y no repetitivo.
 Regla especial: para origen y destino, acepta cualquier ubicación que el cliente indique (ciudad, calle, referencia, etc.) como válida. Nunca pidas dirección exacta ni más precisión, y nunca insistas si ya se indicó una ubicación. Nunca preguntes por la ubicación actual del usuario ni por "dirección específica" ni por "dirección exacta". Si el usuario indica cualquier lugar, acéptalo tal cual, sin pedir detalles adicionales.
 Nunca preguntes por la ubicación actual del usuario ni por dirección exacta ni por dirección específica. Si el usuario indica cualquier lugar, acéptalo tal cual, sin pedir detalles adicionales.
 Nunca generes frases como "¿En qué ciudad o dirección específica te encuentras en este momento?", "¿Dónde estás ahora?", "¿Me puedes dar la dirección exacta?", "¿Cuál es tu ubicación actual?", ni variantes similares. Si el usuario indica cualquier lugar, acéptalo tal cual, sin pedir detalles adicionales.
+Alcance: SOLO puedes hablar de Transportes Miramar y del proceso de cotizar viajes con la empresa. Si el usuario pide algo distinto, responde brevemente que tu misión es gestionar cotizaciones de Transportes Miramar y redirígelo a ese objetivo.
 """
 
 # -----------------------
@@ -548,8 +655,8 @@ class MiramarSellerBot:
 
     def generate_greeting_llm(self) -> str:
         prompt = (BASE_STYLE + """
-Tarea: Genera el primer mensaje para iniciar la cotización.
-Objetivo del mensaje: pedir origen y destino del transporte.
+Tarea: Genera el primer mensaje para saludar cordialmente al usuario.
+Objetivo del mensaje: dar la bienvenida y ofrecer ayuda sin pedir datos aún.
 Guía de estilo:
 - El mensaje debe ser cálido, profesional, claro y bien redactado.
 - No repitas ni copies frases de ejemplos anteriores.
@@ -561,11 +668,11 @@ Reglas:
 - Revisa mentalmente la frase antes de responder, como lo haría un profesional.
 - Si tienes dudas, prioriza la claridad y corrección.
 - Una sola oración. Termina en pregunta.
-- Empieza con un saludo cordial (por ejemplo, “Hola” o “Hola, buen día”) y luego formula la pregunta.
-- No pidas más datos todavía (ni fecha, ni hora, ni regreso, ni cantidad).
-- Para origen y destino, acepta cualquier ubicación que el cliente indique (ciudad, calle, referencia, etc.) como válida. Nunca pidas dirección exacta ni más precisión.
-- Prohibido usar expresiones como “¿dónde estás?”, “¿en qué lugar te encuentras?”, “¿dónde te encuentras en este momento?” o pedir ubicación actual.
-- Formula la pregunta directamente sobre el lugar de partida del viaje, no sobre la ubicación actual del usuario.
+- Empieza con un saludo cordial (por ejemplo, “Hola” o “Hola, buen día”) y ofrece tu ayuda.
+- No pidas información de viaje todavía (no menciones origen, destino, fecha, hora, regreso ni cantidad en este primer mensaje).
+- Mantén el tono cálido, profesional y amistoso.
+- Después de saludar, pregunta si desea cotizar un viaje o cómo podrías ayudarlo.
+- Menciona explícitamente que hablas en nombre de Transportes Miramar.
 - Mantén un tono cálido y profesional.
 - Varía levemente la redacción en cada turno para sonar natural y no repetitivo.
 - No uses la misma estructura dos veces seguidas.
@@ -587,8 +694,16 @@ Entrega: <msg>…</msg>
             )
         text = MiramarSellerBot.decode_new_only(self.tokenizer, outputs, inputs)
         m = re.search(r"<msg>(.*?)</msg>", text, flags=re.IGNORECASE | re.DOTALL)
-        greeting = m.group(1).strip() if m else text.strip()
-        greeting = re.sub(r"</?msg>", "", greeting, flags=re.IGNORECASE).strip()
+        if m:
+            greeting = re.sub(r"</?msg>", "", m.group(1), flags=re.IGNORECASE).strip()
+        else:
+            greeting = re.sub(r"</?msg>", "", text, flags=re.IGNORECASE).strip()
+        if re.search(
+            r"en qué lugar te encuentras|dónde estás|donde te encuentras|desde qué lugar",
+            greeting,
+            re.IGNORECASE,
+        ):
+            return self.generate_greeting_llm()
         return greeting
 
     def initial_prompt(self) -> str:
@@ -609,6 +724,9 @@ Entrega: <msg>…</msg>
                 missing.append(k)
         if not missing:
             return None
+        question_fields = _select_question_fields(missing)
+        if not question_fields:
+            question_fields = missing[:2]
         confirmed = {
             k: self.state[k]
             for k in ["origen", "destino", "fecha", "hora", "regreso", "cantidad"]
@@ -620,8 +738,8 @@ Entrega: <msg>…</msg>
             + f"""
 Contexto de la cotización (estado): {self.state}
 Datos confirmados: {confirmed}
-Campos faltantes: {missing}
-Tarea: escribe UNA sola pregunta que avance la conversación y pida únicamente esos campos faltantes.
+Campos faltantes para esta pregunta: {question_fields}
+Tarea: escribe UNA sola pregunta que avance la conversación y pida únicamente esos campos listados.
 Reglas clave:
 - Expresa la pregunta en tono cordial tipo WhatsApp y en una sola oración.
 - No incluyas saludos ni despedidas; comienza directamente con la pregunta.
@@ -631,6 +749,7 @@ Reglas clave:
 - No reformules ni retomes datos listados en Datos confirmados; asume que ya quedaron claros.
 - Si falta “regreso”, pregunta únicamente si el viaje es solo ida o incluye regreso (ej.: “¿El viaje es solo ida o también incluye regreso?”) y no menciones horarios de regreso ni ciudades adicionales.
 - Si faltan “regreso” y “cantidad”, puedes unirlos en la misma oración manteniendo primero la pregunta sobre el regreso y luego la cantidad de personas.
+- Pide como máximo DOS datos en la misma pregunta; si faltan más, prioriza según el orden del listado en Campos faltantes.
 - Puedes agrupar hasta dos campos en la misma pregunta (por ejemplo fecha+hora o regreso+cantidad) si faltan ambos.
 - Termina siempre con signo de interrogación de cierre.
 - Mantén la redacción fluida, evita copiar literalmente instrucciones de este prompt y no repitas siempre la misma estructura.
@@ -639,15 +758,15 @@ Entrega: <q>…</q>
 <q>
 """
         )
-        pregunta = self._generate_question_with_prompt(prompt, missing)
+        pregunta = self._generate_question_with_prompt(prompt, question_fields)
         if pregunta:
             return pregunta
-        fallback = _build_fallback_question(missing)
+        fallback = _build_fallback_question(question_fields)
         if fallback:
             return fallback
         return "¿Podrías confirmarme el dato que nos falta para seguir con la cotización?"
 
-    def _generate_question_with_prompt(self, prompt: str, missing: list[str]) -> str | None:
+    def _generate_question_with_prompt(self, prompt: str, question_fields: list[str]) -> str | None:
         for attempt in range(2):
             inputs = self.tokenizer(prompt, return_tensors="pt")
             inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
@@ -667,7 +786,7 @@ Entrega: <q>…</q>
             pregunta = re.sub(r"</?q>", "", pregunta, flags=re.IGNORECASE).strip()
             if not pregunta:
                 return None
-            if not _question_mentions_forbidden(pregunta, missing):
+            if not _question_mentions_forbidden(pregunta, question_fields):
                 return pregunta
             # Refuerza instrucciones para reintentar sin mencionar datos confirmados
             prompt = (
@@ -753,6 +872,10 @@ Reglas:
 
     def update_state(self, user_input: str):
         new_fields = self.validate_input_llm(user_input)
+        # Si la fecha no se extrajo y el usuario solo indicó hora
+        if "hora" in new_fields and "fecha" not in new_fields and not self.state["fecha"]:
+            # no agregamos fecha vacía; la pregunta siguiente la pedirá
+            pass
         # Intenta capturar origen y destino juntos si aún faltan
         if (not self.state["origen"] or not self.state["destino"]) and (
             "origen" not in new_fields or "destino" not in new_fields
@@ -794,12 +917,19 @@ Reglas:
                     if not value_str or value_str.lower() in LOCATION_EXCLUDE:
                         continue
                 if key == "fecha":
+                    if not user_mentions_date(user_input):
+                        continue
                     value_str = normalize_fecha(value_str, user_input)
                 if key == "regreso":
+                    if not user_mentions_regreso(user_input):
+                        continue
                     normalized_regreso = normalize_regreso(value_str)
                     if not normalized_regreso:
                         continue
                     value_str = normalized_regreso
+                if key == "hora":
+                    if not user_mentions_time(user_input):
+                        continue
                 if key == "especial" and value_str.lower() in ["no", "ninguno", "ninguna", "no tengo", "no tenemos"]:
                     self.state[key] = value_str
                     actualizados[key] = value_str
@@ -818,7 +948,7 @@ Reglas:
             return "Por favor, escribe tu mensaje."
         mensaje, hubo_cambios = self.update_state(user_input)
         siguiente = self.next_missing()
-        final_msg = "¡Gracias! Hemos recibido tu solicitud. Un administrador la revisará pronto."
+        final_msg = "¡Gracias! Desde Transportes Miramar revisaremos tu solicitud a la brevedad."
         if hubo_cambios:
             if siguiente:
                 pregunta = self.get_next_question()
@@ -840,37 +970,39 @@ Reglas:
             return final_msg
         if mensaje:
             return mensaje
-        return "La solicitud ya está registrada. Si necesitas otro traslado, cuéntame."
+        return "La solicitud ya está registrada con Transportes Miramar. Si necesitas otro traslado, cuéntame."
 
 def main():
     # Carga el modelo y tokenizer una sola vez
     model, tokenizer, device = load_model_and_tokenizer()
     bot = MiramarSellerBot(model, tokenizer, device)
 
+    label_bot = "Transportes Miramar"
+    label_user = "Tu"
+
     saludo_inicial = bot.initial_prompt()
-    print(f"🤖: {_sanitize_print(saludo_inicial)}", flush=True)
-    cotizando = True
+    print(f"{label_bot}: {_sanitize_print(saludo_inicial)}", flush=True)
+    cotizando = False
 
     while True:
-        user_input = input("\nTú: ").strip()
+        user_input = input(f"\n{label_user}: ").strip()
 
         # Salida amable
         if re.search(r"\b(chao|adiós|adios|hasta luego|nos vemos|bye)\b", user_input, re.IGNORECASE):
-            print("🤖: ¡Hasta luego! Si tienes más preguntas en el futuro, no dudes en consultar.")
+            print(f"{label_bot}: ¡Hasta luego! Si necesitas otra cotización, aquí estaré.")
             break
 
         # Evita procesar líneas vacías
         if not user_input:
             if cotizando:
-                print("🤖: Por favor, escribe tu mensaje.")
+                print(f"{label_bot}: Por favor, cuéntame cómo seguimos.")
             else:
-                print("🤖: ¿Te ayudo con una cotización de viaje?")
+                print(f"{label_bot}: ¿Te ayudo con una cotización de viaje?")
             continue
 
-        # 👉 Si ya estamos en modo cotización, procesar con el bot
         if cotizando:
             respuesta = bot.run_step(user_input)
-            print(f"🤖: {_sanitize_print(respuesta)}", flush=True)
+            print(f"{label_bot}: {_sanitize_print(respuesta)}", flush=True)
             continue
 
         # Si aún no se detecta intención de cotizar, el LLM debe decidir
@@ -921,13 +1053,14 @@ Respuesta:
                 if question:
                     fragments.append(question)
             response_text = "\n".join(_sanitize_print(part) for part in fragments if part)
-            print(f"🤖: {response_text}", flush=True)
+            print(f"{label_bot}: {response_text}", flush=True)
             continue
 
         # Respuesta breve si no es cotización
         prompt_no_cotiza = (BASE_STYLE + f"""
 Tarea: Responde de forma cordial y profesional cuando el usuario no está solicitando cotización de viaje.
 Guía de estilo: WhatsApp, breve, cálido, sin tecnicismos.
+Recuerda: SOLO puedes hablar de cotizaciones de Transportes Miramar. Si el usuario pide otra cosa, explica amablemente que solo gestionas reservas y cotizaciones de Transportes Miramar y ofrece continuar con ese proceso.
 Mensaje del usuario: {user_input}
 Entrega: <msg>…</msg>
 <msg>
@@ -948,6 +1081,6 @@ Entrega: <msg>…</msg>
         m = re.search(r"<msg>(.*?)</msg>", text, flags=re.IGNORECASE | re.DOTALL)
         respuesta_general = m.group(1).strip() if m else text.strip()
         respuesta_general = re.sub(r"</?msg>", "", respuesta_general, flags=re.IGNORECASE).strip()
-        print(f"🤖: {_sanitize_print(respuesta_general)}", flush=True)
+        print(f"{label_bot}: {_sanitize_print(respuesta_general)}", flush=True)
 if __name__ == "__main__":
     main()
